@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Мировая Наука PRO: Космическая Лаборатория</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        :root { --primary: #00d2ff; --secondary: #3a7bd5; --accent: #00ffcc; --dark: #050a0f; }
+        body { margin: 0; font-family: 'Segoe UI', sans-serif; background: var(--dark); color: white; overflow-x: hidden; }
+        
+        header { 
+            padding: 20px; text-align: center; background: rgba(0,0,0,0.8); 
+            border-bottom: 2px solid var(--primary); position: sticky; top: 0; z-index: 1000;
+        }
+        nav { display: flex; justify-content: center; gap: 10px; margin-top: 15px; flex-wrap: wrap; }
+        nav button { 
+            padding: 10px 20px; border: none; border-radius: 5px; background: var(--secondary); 
+            color: white; font-weight: bold; cursor: pointer; transition: 0.3s;
+        }
+        nav button:hover { background: var(--primary); transform: scale(1.05); }
+
+        section { display: none; padding: 40px 20px; max-width: 1200px; margin: 0 auto; animation: fadeIn 0.5s; }
+        .active { display: block; }
+
+        .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+        .card { 
+            background: rgba(255,255,255,0.05); padding: 20px; border-radius: 15px; 
+            border: 1px solid rgba(255,255,255,0.1); transition: 0.3s;
+        }
+        .card:hover { transform: translateY(-5px); border-color: var(--accent); }
+        .card h3 { color: var(--accent); margin: 0 0 10px 0; }
+        .tag { display: inline-block; background: var(--secondary); padding: 2px 8px; border-radius: 4px; font-size: 12px; margin-bottom: 10px; }
+
+        /* 3D Lab */
+        #canvas-container { width: 100%; height: 600px; background: #000; border-radius: 15px; position: relative; cursor: crosshair; overflow: hidden; }
+        .lab-ui { 
+            position: absolute; top: 20px; left: 20px; z-index: 10; 
+            background: rgba(0,0,0,0.85); padding: 15px; border-radius: 10px; border: 2px solid var(--primary);
+        }
+        .lab-ui button { display: block; width: 100%; margin: 8px 0; padding: 12px; cursor: pointer; border: none; border-radius: 4px; font-weight: bold; color: white; background: #222; transition: 0.2s; }
+        .lab-ui button:hover { background: var(--primary); color: black; }
+        
+        .speed-gauge { 
+            position: absolute; bottom: 30px; right: 30px; background: rgba(0,0,0,0.8); 
+            padding: 20px; border-radius: 50%; border: 4px solid var(--accent); width: 100px; height: 100px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            box-shadow: 0 0 20px var(--accent); pointer-events: none;
+        }
+        .speed-val { font-size: 24px; font-weight: 900; color: var(--accent); }
+        .speed-label { font-size: 10px; text-transform: uppercase; }
+
+        /* Test & Cert */
+        .quiz-box { background: rgba(255,255,255,0.03); padding: 20px; border-radius: 10px; margin-bottom: 15px; border-left: 4px solid var(--secondary); }
+        .grade-result { font-size: 80px; text-align: center; font-weight: 900; margin: 20px; text-shadow: 0 0 30px rgba(0,255,204,0.8); }
+        .cert-form { text-align: center; background: #111; padding: 30px; border-radius: 20px; display: none; margin-top: 20px; border: 2px solid var(--accent); }
+        input { padding: 15px; border-radius: 8px; border: 1px solid var(--primary); width: 300px; margin-bottom: 15px; background: #222; color: white; text-align: center; font-size: 18px; }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>🌍 НАУЧНЫЕ ОТКРЫТИЯ & КОСМОС 3D</h1>
+    <nav>
+        <button onclick="showSection('scientists')">Энциклопедия</button>
+        <button onclick="showSection('lab')">3D Лаборатория</button>
+        <button onclick="showSection('test')">Экзамен</button>
+    </nav>
+</header>
+
+<section id="scientists" class="active">
+    <div class="cards" id="scientistsGrid"></div>
+</section>
+
+<section id="lab">
+    <div id="canvas-container" onmousedown="handleAction()">
+        <div class="lab-ui">
+            <button onclick="changeExp('gravity')">☄️ Орбиты & Метеориты</button>
+            <button onclick="changeExp('magnet')">🧲 Магнетизм (Притяжение)</button>
+            <button onclick="changeExp('spinner')">🚀 Турбо-Спиннер</button>
+            <button onclick="changeExp('prism')">🌈 Призма Ньютона</button>
+            <button onclick="changeExp('atom')">⚛️ Атом Бора</button>
+        </div>
+        <div class="speed-gauge" id="gauge" style="display:none;">
+            <div class="speed-val" id="speedText">0</div>
+            <div class="speed-label">RPM</div>
+        </div>
+    </div>
+    <div id="exp-info" style="margin-top:20px; padding: 20px; border-radius: 10px; background: rgba(0,210,255,0.1); border: 1px solid var(--primary); line-height: 1.6;"></div>
+</section>
+
+<section id="test">
+    <div id="quiz-container"></div>
+    <button onclick="checkQuiz()" style="width:100%; padding: 25px; background: var(--accent); color: black; font-weight: bold; border: none; cursor: pointer; font-size: 22px; border-radius: 15px;">ЗАВЕРШИТЬ ТЕСТ</button>
+    
+    <div id="results" style="display:none;">
+        <div id="gradeDisp" class="grade-result"></div>
+        <div class="cert-form" id="certForm">
+            <h2 style="color:var(--accent)">СЕРТИФИКАТ ГОТОВ!</h2>
+            <input type="text" id="userName" placeholder="Имя Фамилия (Латиницей)"><br>
+            <button onclick="downloadCert()" style="padding: 15px 40px; background: var(--primary); color: white; border: none; border-radius: 10px; font-weight: bold; cursor: pointer;">СКАЧАТЬ PDF</button>
+        </div>
+    </div>
+</section>
+
+<script>
+    const scientists = [
+        { name: "Ибн Сино", cat: "Медицина", info: "Великий целитель Востока. Его труды стали фундаментом для врачей на сотни лет вперёд." },
+        { name: "Абу Райхан Беруни", cat: "Астрономия", info: "Первым предположил вращение Земли вокруг Солнца и существование новых континентов." },
+        { name: "Захириддин Бабур", cat: "Энциклопедист", info: "Учёный и правитель. Его 'Бабур-наме' содержит ценнейшие сведения о флоре и фауне." },
+        { name: "Исаак Ньютон", cat: "Физика", info: "Открыл закон тяготения, доказав, что небесные тела подчиняются тем же законам, что и земные." },
+        { name: "Альберт Эйнштейн", cat: "Физика", info: "Автор теории относительности, связавший время, пространство и гравитацию." },
+        { name: "Никола Тесла", cat: "Инженерия", info: "Гений электричества. Мечтал о передаче энергии без проводов по всей планете." },
+        { name: "Мария Кюри", cat: "Химия", info: "Первооткрывательница радиоактивности и единственная женщина с двумя Нобелевскими премиями." },
+        { name: "Дмитрий Менделеев", cat: "Химия", info: "Создал таблицу элементов, предсказав свойства ещё не открытых веществ." },
+        { name: "Галилео Галилей", cat: "Астрономия", info: "Первым увидел кратеры на Луне и спутники Юпитера через свой телескоп." },
+        { name: "Чарльз Дарвин", cat: "Биология", info: "Объяснил происхождение видов через естественный отбор." }
+    ];
+
+    function renderScientists() {
+        const grid = document.getElementById('scientistsGrid');
+        grid.innerHTML = scientists.map(s => `
+            <div class="card">
+                <span class="tag">${s.cat}</span>
+                <h3>${s.name}</h3>
+                <p>${s.info}</p>
+            </div>
+        `).join('');
+    }
+
+    // --- 3D ENGINE ---
+    let scene, camera, renderer, currentModel, currentType = 'gravity';
+    let meteors = [], magneticParticles = [];
+    let rotationSpeed = 0;
+    let clock = new THREE.Clock();
+
+    function init3D() {
+        const container = document.getElementById('canvas-container');
+        scene = new THREE.Scene();
+        camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
+        renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        container.appendChild(renderer.domElement);
+
+        const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+        const point = new THREE.PointLight(0x00d2ff, 1, 100);
+        point.position.set(10, 10, 10);
+        scene.add(ambient, point);
+        
+        camera.position.set(0, 10, 15);
+        camera.lookAt(0, 0, 0);
+        
+        changeExp('gravity');
+        animate();
+    }
+
+    function createMeteor() {
+        const geo = new THREE.SphereGeometry(0.1, 8, 8);
+        const mat = new THREE.MeshBasicMaterial({color: 0xffffff});
+        const m = new THREE.Mesh(geo, mat);
+        m.position.set(Math.random()*40-20, Math.random()*20+10, Math.random()*40-20);
+        const trailGeo = new THREE.BufferGeometry();
+        const trailMat = new THREE.LineBasicMaterial({color: 0x00d2ff, transparent: true, opacity: 0.5});
+        meteors.push({mesh: m, velocity: new THREE.Vector3(Math.random()*0.5, -0.5 - Math.random(), 0)});
+        scene.add(m);
+    }
+
+    function changeExp(type) {
+        if (currentModel) scene.remove(currentModel);
+        currentType = type;
+        rotationSpeed = 0;
+        meteors.forEach(m => scene.remove(m.mesh));
+        meteors = [];
+        magneticParticles.forEach(p => scene.remove(p.mesh));
+        magneticParticles = [];
+        
+        const info = document.getElementById('exp-info');
+        const gauge = document.getElementById('gauge');
+        gauge.style.display = (type === 'spinner') ? 'flex' : 'none';
+        
+        const group = new THREE.Group();
+        
+        if (type === 'gravity') {
+            const sun = new THREE.Mesh(new THREE.SphereGeometry(2, 32, 32), new THREE.MeshBasicMaterial({color: 0xffcc00}));
+            const p = new THREE.Mesh(new THREE.SphereGeometry(0.7, 32, 32), new THREE.MeshStandardMaterial({color: 0x00aaff}));
+            p.position.x = 8;
+            group.add(sun, p);
+            info.innerHTML = "<strong>Опыт Ньютона:</strong> Вращение планет и падающие метеориты. В космосе объекты движутся под действием гравитации.";
+        } 
+        else if (type === 'magnet') {
+            const magnetNorth = new THREE.Mesh(new THREE.BoxGeometry(2, 4, 1), new THREE.MeshStandardMaterial({color: 0xff0000}));
+            const magnetSouth = new THREE.Mesh(new THREE.BoxGeometry(2, 4, 1), new THREE.MeshStandardMaterial({color: 0x0000ff}));
+            magnetNorth.position.y = 2.1;
+            magnetSouth.position.y = -2.1;
+            group.add(magnetNorth, magnetSouth);
+
+            for(let i=0; i<60; i++) {
+                const part = new THREE.Mesh(new THREE.SphereGeometry(0.1), new THREE.MeshBasicMaterial({color: 0x00ffcc}));
+                part.position.set(Math.random()*12-6, Math.random()*12-6, Math.random()*6-3);
+                magneticParticles.push({
+                    mesh: part, 
+                    home: part.position.clone(),
+                    speed: 0.02 + Math.random()*0.05
+                });
+                scene.add(part);
+            }
+            info.innerHTML = "<strong>Магнетизм:</strong> Частицы (электроны) притягиваются к полюсам магнита, визуализируя невидимые магнитные поля.";
+        } 
+        else if (type === 'spinner') {
+            const body = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 0.5, 32), new THREE.MeshStandardMaterial({color: 0x444444}));
+            for(let i=0; i<3; i++) {
+                const wing = new THREE.Mesh(new THREE.BoxGeometry(5, 0.2, 1.5), new THREE.MeshStandardMaterial({color: 0x00ffcc}));
+                wing.rotation.y = (i * Math.PI * 2) / 3;
+                group.add(wing);
+            }
+            group.add(body);
+            info.innerHTML = "<strong>Турбо-Спиннер:</strong> Кликайте быстрее! Каждый клик разгоняет устройство.";
+        }
+        else if (type === 'prism') {
+            const prism = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 4, 3), new THREE.MeshPhongMaterial({color: 0xffffff, transparent: true, opacity: 0.5}));
+            group.add(prism);
+            info.innerHTML = "<strong>Оптика:</strong> Разложение света в радужный спектр при прохождении через стеклянную призму.";
+        }
+        else if (type === 'atom') {
+            const core = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 32), new THREE.MeshBasicMaterial({color: 0xff4444}));
+            const e = new THREE.Mesh(new THREE.SphereGeometry(0.3, 32, 32), new THREE.MeshBasicMaterial({color: 0x00d2ff}));
+            group.add(core, e);
+            info.innerHTML = "<strong>Модель Атома Бора:</strong> Электроны вращаются вокруг ядра на строго определенных расстояниях.";
+        }
+
+        currentModel = group;
+        scene.add(currentModel);
+    }
+
+    function handleAction() {
+        if (currentType === 'spinner') {
+            rotationSpeed += 4.5;
+            if (rotationSpeed > 60) rotationSpeed = 60;
+        }
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+        const delta = clock.getDelta();
+        const elapsed = clock.getElapsedTime();
+
+        // Анимация метеоритов для Орбиты
+        if (currentType === 'gravity') {
+            if (Math.random() < 0.05) createMeteor();
+            meteors.forEach((m, idx) => {
+                m.mesh.position.add(m.velocity);
+                if (m.mesh.position.y < -15) {
+                    scene.remove(m.mesh);
+                    meteors.splice(idx, 1);
+                }
+            });
+            const p = currentModel.children[1];
+            p.position.x = Math.cos(elapsed) * 10;
+            p.position.z = Math.sin(elapsed) * 10;
+            p.rotation.y += 0.05;
+        }
+
+        // Анимация притяжения частиц для Магнетизма
+        if (currentType === 'magnet') {
+            magneticParticles.forEach(p => {
+                const targetPos = (p.mesh.position.y > 0) ? new THREE.Vector3(0, 4, 0) : new THREE.Vector3(0, -4, 0);
+                p.mesh.position.lerp(targetPos, p.speed * 0.1);
+                
+                // Возвращаем частицы если они "прилипли" слишком близко
+                if (p.mesh.position.distanceTo(targetPos) < 0.5) {
+                    p.mesh.position.set(Math.random()*12-6, Math.random()*12-6, Math.random()*6-3);
+                }
+            });
+            currentModel.rotation.y += 0.005;
+        }
+
+        if (currentModel) {
+            if (currentType === 'spinner') {
+                currentModel.rotation.y += rotationSpeed * delta;
+                rotationSpeed *= 0.98;
+                document.getElementById('speedText').innerText = Math.floor(rotationSpeed * 50);
+            } else if (currentType === 'atom') {
+                const e = currentModel.children[1];
+                e.position.x = Math.cos(elapsed * 4) * 5;
+                e.position.z = Math.sin(elapsed * 4) * 5;
+                e.position.y = Math.sin(elapsed * 2) * 2;
+            } else if (currentType === 'prism') {
+                currentModel.rotation.y += 0.01;
+            }
+        }
+        
+        renderer.render(scene, camera);
+    }
+
+    // --- QUIZ & CERT ---
+    const quizData = [
+        { q: "Кто предсказал существование новых материков за океаном в XI веке?", a: ["Ибн Сино", "Беруни", "Ньютон"], c: 1 },
+        { q: "Автор книги 'Бабур-наме'?", a: ["Эйнштейн", "Бабур", "Менделеев"], c: 1 },
+        { q: "Какой ученый разложил белый свет на спектр?", a: ["Тесла", "Ньютон", "Дарвин"], c: 1 },
+        { q: "Автор теории относительности?", a: ["Галилей", "Кюри", "Эйнштейн"], c: 2 },
+        { q: "Кто открыл закон всемирного тяготения?", a: ["Ньютон", "Беруни", "Бабур"], c: 0 }
+    ];
+
+    function initQuiz() {
+        const container = document.getElementById('quiz-container');
+        container.innerHTML = quizData.map((d, i) => `
+            <div class="quiz-box">
+                <p><strong>${i+1}. ${d.q}</strong></p>
+                ${d.a.map((ans, j) => `<label style="display:block; margin:8px 0;"><input type="radio" name="q${i}" value="${j}"> ${ans}</label>`).join('')}
+            </div>
+        `).join('');
+    }
+
+    let grade = "D", score = 0;
+    function checkQuiz() {
+        score = 0;
+        quizData.forEach((d, i) => {
+            const sel = document.querySelector(`input[name="q${i}"]:checked`);
+            if (sel && parseInt(sel.value) === d.c) score++;
+        });
+
+        const p = (score / quizData.length) * 100;
+        if (p >= 90) grade = "A";
+        else if (p >= 70) grade = "B";
+        else if (p >= 50) grade = "C";
+        else grade = "D";
+
+        document.getElementById('results').style.display = "block";
+        const disp = document.getElementById('gradeDisp');
+        disp.innerText = `GRADE: ${grade}`;
+        disp.style.color = (grade === 'A' || grade === 'B') ? '#00ffcc' : '#ff4444';
+        document.getElementById('certForm').style.display = "block";
+        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    }
+
+    function downloadCert() {
+        const name = document.getElementById('userName').value.trim() || "Young Scientist";
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('landscape');
+
+        doc.setFillColor(10, 15, 20);
+        doc.rect(0, 0, 297, 210, 'F');
+        doc.setDrawColor(0, 210, 255);
+        doc.setLineWidth(5);
+        doc.rect(10, 10, 277, 190);
+
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(44);
+        doc.text("DIPLOMA OF EXCELLENCE", 148, 55, { align: "center" });
+        
+        doc.setFontSize(20);
+        doc.text("This certificate confirms that the student", 148, 85, { align: "center" });
+
+        doc.setTextColor(0, 255, 204);
+        doc.setFontSize(36);
+        doc.text(name.toUpperCase(), 148, 115, { align: "center" });
+
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(18);
+        doc.text("has successfully completed the World Science & 3D Lab course", 148, 145, { align: "center" });
+
+        doc.setFontSize(34);
+        doc.setTextColor(0, 210, 255);
+        doc.text(`CERTIFIED GRADE: ${grade}`, 148, 180, { align: "center" });
+
+        doc.setFontSize(12);
+        doc.setTextColor(150, 150, 150);
+        doc.text(`Date: ${new Date().toLocaleDateString()} | SciencePRO Global Education`, 148, 195, { align: "center" });
+
+        doc.save(`ScienceCert_${name}.pdf`);
+    }
+
+    function showSection(id) {
+        document.querySelectorAll('section').forEach(s => s.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        if (id === 'lab' && !renderer) init3D();
+    }
+
+    window.onload = () => {
+        renderScientists();
+        initQuiz();
+    };
+</script>
+</body>
+</html>
